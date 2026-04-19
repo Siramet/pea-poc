@@ -58,7 +58,14 @@ def check_alerts(forecast, bess_soc=60.0):
                 "message":f"Load เปลี่ยนเร็ว {ramp:.0f} kW/hr","at_datetime":dts[i],
                 "recommendation":"BESS รองรับได้ทันที"})
     alerts.sort(key=lambda a: {"critical":0,"warning":1,"info":2}[a["level"]])
-    return alerts[:20]
+    seen = set()
+    deduped = []
+    for a in alerts:
+        key = (a["level"], a["code"])
+        if key not in seen:
+            seen.add(key)
+            deduped.append(a)
+    return deduped[:20]
 
 def build_response(alerts):
     has_critical = any(a["level"]=="critical" for a in alerts)
