@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 st.set_page_config(page_title="Diesel Tank Manager", layout="wide", page_icon="⛽")
 
-from shared.synthetic_data import get_site_config, generate_load
+from shared.synthetic_data import get_site_config, generate_load, generate_pv
 from module2_optimization.app import rule_dispatch, COSTS
 
 CONFIG = get_site_config()
@@ -33,13 +33,13 @@ def weighted_avg_price(history):
     return total_cost / total_vol if total_vol > 0 else 0
 
 def forecast_daily_diesel(days=7, strategy="cost_minimize", bess_soc=60):
+    from shared.synthetic_data import generate_pv
     today = pd.Timestamp.now().floor("h")
     daily = []
     for d in range(days):
         date = today + pd.Timedelta(days=d)
         load_df = generate_load(str(date.date()), 24)
-        pv_df   = __import__('shared.synthetic_data',
-                  fromlist=['generate_pv']).generate_pv(str(date.date()), 24)
+        pv_df   = generate_pv(str(date.date()), 24)
         fc = [{"datetime": str(load_df["ds"].iloc[i]),
                "load_kw": round(float(load_df["y"].iloc[i]), 1),
                "pv_kw":   round(float(pv_df["y"].iloc[i]), 1),
@@ -48,8 +48,11 @@ def forecast_daily_diesel(days=7, strategy="cost_minimize", bess_soc=60):
         sch = rule_dispatch(fc, bess_soc, strategy)
         diesel_kwh = sum(h["diesel_kw"] for h in sch)
         diesel_L   = diesel_kwh * COSTS["diesel_liter_per_kwh"]
-        daily.append({"date": date.date(), "diesel_L": round(diesel_L, 1),
-                      "diesel_kwh": round(diesel_kwh, 1)})
+        # เพิ่ม standby usage แม้ไม่ได้รัน Diesel จริง (maintenance + idle)
+    standby_L = 20.0  # ~20L/วัน สำหรับ warm standby
+    diesel_L_total = diesel_L + standby_L
+    daily.append({"date": date.date(), "diesel_L": round(diesel_L_total, 1),
+                  "diesel_kwh": round(diesel_kwh, 1)})
     return daily
 
 # ── Sidebar settings ───────────────────────────────────────────────────────
