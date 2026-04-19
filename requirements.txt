@@ -4,3 +4,6 @@ numpy
 prophet
 scikit-learn
 pulp
+fastapi
+uvicorn
+httpx
